@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Pipe — Klasik Pipe Mania oyununun modern ve minimalist web versiyonu.">
+    <meta name="description" content="Pipe — A modern and minimalist web version of the classic Pipe Mania game.">
     <title>Pipe</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,7 @@
             </div>
             <div class="header-stats">
                 <div class="stat" id="stat-score">
-                    <span class="stat-label">skor</span>
+                    <span class="stat-label">score</span>
                     <span class="stat-value" id="score-display">0</span>
                 </div>
                 <div class="stat-divider"></div>
@@ -29,16 +29,21 @@
                     <span class="stat-value" id="level-display">1</span>
                 </div>
                 <div class="stat-divider"></div>
+                <div class="stat" id="stat-target">
+                    <span class="stat-label">target</span>
+                    <span class="stat-value" id="target-display">8</span>
+                </div>
+                <div class="stat-divider"></div>
                 <div class="stat" id="stat-highscore">
-                    <span class="stat-label">rekor</span>
+                    <span class="stat-label">best</span>
                     <span class="stat-value" id="highscore-display">0</span>
                 </div>
             </div>
             <div class="header-right">
-                <button id="btn-new-game" class="icon-btn" title="Yeni Oyun (F2)">
+                <button id="btn-new-game" class="icon-btn" title="New Game (F2)">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                 </button>
-                <button id="btn-settings" class="icon-btn" title="Ayarlar">
+                <button id="btn-settings" class="icon-btn" title="Settings">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor"/><circle cx="16" cy="12" r="2" fill="currentColor"/><circle cx="10" cy="18" r="2" fill="currentColor"/></svg>
                 </button>
             </div>
@@ -47,13 +52,13 @@
         <!-- Info bar -->
         <div id="info-bar">
             <div id="countdown-bar"><div id="countdown-fill"></div></div>
-            <span id="info-text">Boruları yerleştir</span>
+            <span id="info-text">Place pipes</span>
         </div>
 
         <!-- Game area -->
         <main id="game-area">
             <div id="queue-panel">
-                <div class="queue-label">SIRADA</div>
+                <div class="queue-label">NEXT</div>
                 <div id="queue-list"></div>
             </div>
             <div id="canvas-wrap">
@@ -65,19 +70,19 @@
         <div id="overlay-level" class="overlay hidden">
             <div class="modal">
                 <div class="modal-emoji">🎉</div>
-                <h2>Level Tamamlandı!</h2>
+                <h2>Level Complete!</h2>
                 <div class="modal-stats">
                     <div class="modal-stat">
                         <span class="modal-stat-value" id="level-pipes">0</span>
-                        <span class="modal-stat-label">boru</span>
+                        <span class="modal-stat-label">pipes</span>
                     </div>
                     <div class="modal-stat">
                         <span class="modal-stat-value" id="level-score-gain">0</span>
-                        <span class="modal-stat-label">puan</span>
+                        <span class="modal-stat-label">points</span>
                     </div>
                 </div>
                 <p id="level-message" class="modal-message"></p>
-                <button id="btn-next-level" class="btn-primary">Sonraki Level</button>
+                <button id="btn-next-level" class="btn-primary">Next Level</button>
             </div>
         </div>
 
@@ -85,11 +90,11 @@
         <div id="overlay-gameover" class="overlay hidden">
             <div class="modal">
                 <div class="modal-emoji">🏁</div>
-                <h2>Oyun Bitti</h2>
+                <h2>Game Over</h2>
                 <div class="modal-stats">
                     <div class="modal-stat">
                         <span class="modal-stat-value" id="final-score">0</span>
-                        <span class="modal-stat-label">skor</span>
+                        <span class="modal-stat-label">score</span>
                     </div>
                     <div class="modal-stat">
                         <span class="modal-stat-value" id="final-level">1</span>
@@ -97,20 +102,20 @@
                     </div>
                     <div class="modal-stat">
                         <span class="modal-stat-value" id="final-pipes">0</span>
-                        <span class="modal-stat-label">boru</span>
+                        <span class="modal-stat-label">pipes</span>
                     </div>
                 </div>
                 <p id="final-message" class="modal-message"></p>
-                <button id="btn-play-again" class="btn-primary">Tekrar Oyna</button>
+                <button id="btn-play-again" class="btn-primary">Play Again</button>
             </div>
         </div>
 
         <!-- Settings -->
         <div id="overlay-settings" class="overlay hidden">
             <div class="modal modal-settings">
-                <h2>Ayarlar</h2>
+                <h2>Settings</h2>
                 <div class="setting-row">
-                    <span class="setting-label">Boyut</span>
+                    <span class="setting-label">Size</span>
                     <div class="setting-options" id="opt-size">
                         <button class="pill" data-size="5">5×5</button>
                         <button class="pill active" data-size="7">7×7</button>
@@ -118,15 +123,15 @@
                     </div>
                 </div>
                 <div class="setting-row">
-                    <span class="setting-label">Ses</span>
+                    <span class="setting-label">Sound</span>
                     <div class="setting-options" id="opt-sound">
-                        <button class="pill active" data-sound="on">Açık</button>
-                        <button class="pill" data-sound="off">Kapalı</button>
+                        <button class="pill active" data-sound="on">On</button>
+                        <button class="pill" data-sound="off">Off</button>
                     </div>
                 </div>
                 <div class="modal-actions">
-                    <button id="btn-settings-cancel" class="btn-ghost">İptal</button>
-                    <button id="btn-settings-apply" class="btn-primary">Uygula</button>
+                    <button id="btn-settings-cancel" class="btn-ghost">Cancel</button>
+                    <button id="btn-settings-apply" class="btn-primary">Apply</button>
                 </div>
             </div>
         </div>

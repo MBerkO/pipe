@@ -44,12 +44,12 @@
     let prepLeft, prepInterval;
     let flowPath, flowIdx, flowProg, flowAF, lastFlowT;
     let hoverC = -1, hoverR = -1;
-    let cvs, ctx, cs;
+    let cvs, ctx, cs, bgCvs, bgCtx;
     let audioCtx, levelScoreStart;
 
     /* ── DOM refs ── */
     const $ = id => document.getElementById(id);
-    const scoreEl = $('score-display'), levelEl = $('level-display'), hiEl = $('highscore-display');
+    const scoreEl = $('score-display'), levelEl = $('level-display'), hiEl = $('highscore-display'), targetEl = $('target-display');
     const infoBar = $('info-bar'), infoText = $('info-text'), cdFill = $('countdown-fill');
     const queueList = $('queue-list');
     const overlayGO = $('overlay-gameover'), overlayLV = $('overlay-level'), overlayST = $('overlay-settings');
@@ -154,14 +154,18 @@
         const s = canvas.width / dpr;
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         c.clearRect(0, 0, s, s);
-        const cx = s / 2, cy = s / 2, hw = s * 0.23;
+        const cx = s / 2, cy = s / 2;
         const conn = PIPE_CONN[type];
-        c.fillStyle = '#0e0e16';
-        drawPipeRects(c, 0, 0, s, cx, cy, hw + 3, conn);
-        c.fillStyle = '#555570';
-        drawPipeRects(c, 0, 0, s, cx, cy, hw, conn);
-        c.fillStyle = '#6a6a8a';
-        drawPipeRects(c, 0, 0, s, cx, cy, hw - 3, conn);
+        
+        c.lineCap = 'butt';
+        c.lineJoin = 'round';
+        c.strokeStyle = '#1e212b';
+        c.lineWidth = s * 0.45;
+        drawPipePaths(c, cx, cy, s, conn);
+        
+        c.strokeStyle = '#2b2f3e';
+        c.lineWidth = s * 0.25;
+        drawPipePaths(c, cx, cy, s, conn);
     }
 
     /* ── Canvas sizing ── */
@@ -173,45 +177,70 @@
         cs = Math.max(Math.min(Math.floor(aw / CFG.gridSize), Math.floor(ah / CFG.gridSize), 72), 32);
         const w = CFG.gridSize * cs, h = CFG.gridSize * cs;
         const dpr = devicePixelRatio || 1;
+        
         cvs.width = w * dpr; cvs.height = h * dpr;
         cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        if (!bgCvs) {
+            bgCvs = document.createElement('canvas');
+            bgCtx = bgCvs.getContext('2d');
+        }
+        bgCvs.width = w * dpr; bgCvs.height = h * dpr;
+        bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Pre-render background
+        bgCtx.fillStyle = '#0b0c10';
+        bgCtx.fillRect(0, 0, w, h);
+        bgCtx.fillStyle = 'rgba(255,255,255,0.06)';
+        for (let c = 1; c < CFG.gridSize; c++) {
+            for (let r = 1; r < CFG.gridSize; r++) {
+                bgCtx.beginPath(); bgCtx.arc(c * cs, r * cs, 1.5, 0, Math.PI * 2); bgCtx.fill();
+            }
+        }
+        bgCtx.strokeStyle = 'rgba(255,255,255,0.02)';
+        bgCtx.lineWidth = 1;
+        for (let i = 1; i < CFG.gridSize; i++) {
+            bgCtx.beginPath(); bgCtx.moveTo(i * cs, 0); bgCtx.lineTo(i * cs, h); bgCtx.stroke();
+            bgCtx.beginPath(); bgCtx.moveTo(0, i * cs); bgCtx.lineTo(w, i * cs); bgCtx.stroke();
+        }
+
         draw();
     }
 
     /* ── Drawing core ── */
-    function drawPipeRects(c, x, y, size, cx, cy, hw, conn) {
-        c.fillRect(cx - hw, cy - hw, hw * 2, hw * 2);
-        if (conn[T]) c.fillRect(cx - hw, y,  hw * 2, size / 2);
-        if (conn[R]) c.fillRect(cx, cy - hw, size / 2, hw * 2);
-        if (conn[B]) c.fillRect(cx - hw, cy, hw * 2, size / 2);
-        if (conn[L]) c.fillRect(x, cy - hw,  size / 2, hw * 2);
+    function drawPipePaths(c, cx, cy, size, conn) {
+        c.beginPath();
+        const r = size / 2;
+        
+        if (conn[T] && conn[B] && !conn[L] && !conn[R]) {
+            c.moveTo(cx, cy - r); c.lineTo(cx, cy + r);
+        } else if (conn[L] && conn[R] && !conn[T] && !conn[B]) {
+            c.moveTo(cx - r, cy); c.lineTo(cx + r, cy);
+        } else if (conn[T] && conn[R] && !conn[B] && !conn[L]) {
+            c.moveTo(cx, cy - r); c.quadraticCurveTo(cx, cy, cx + r, cy);
+        } else if (conn[R] && conn[B] && !conn[T] && !conn[L]) {
+            c.moveTo(cx + r, cy); c.quadraticCurveTo(cx, cy, cx, cy + r);
+        } else if (conn[B] && conn[L] && !conn[T] && !conn[R]) {
+            c.moveTo(cx, cy + r); c.quadraticCurveTo(cx, cy, cx - r, cy);
+        } else if (conn[L] && conn[T] && !conn[B] && !conn[R]) {
+            c.moveTo(cx - r, cy); c.quadraticCurveTo(cx, cy, cx, cy - r);
+        } else if (conn[T] && conn[B] && conn[L] && conn[R]) {
+            c.moveTo(cx, cy - r); c.lineTo(cx, cy + r);
+            c.moveTo(cx - r, cy); c.lineTo(cx + r, cy);
+        }
+        c.stroke();
     }
 
     /* ── Main draw ── */
     function draw() {
         const gs = CFG.gridSize, w = gs * cs, h = gs * cs;
 
-        // Background
-        ctx.fillStyle = '#0e0e12';
-        ctx.fillRect(0, 0, w, h);
-
-        // Checkerboard cells
-        for (let c = 0; c < gs; c++) for (let r = 0; r < gs; r++) {
-            ctx.fillStyle = (c + r) % 2 === 0 ? '#141420' : '#17172a';
-            ctx.fillRect(c * cs + 1, r * cs + 1, cs - 2, cs - 2);
+        // Draw cached background
+        ctx.clearRect(0, 0, w, h);
+        if (bgCvs) {
+            ctx.drawImage(bgCvs, 0, 0, w, h);
         }
-
-        // Grid lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= gs; i++) {
-            ctx.beginPath(); ctx.moveTo(i * cs, 0); ctx.lineTo(i * cs, h); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i * cs); ctx.lineTo(w, i * cs); ctx.stroke();
-        }
-
-        // Source
-        drawSource();
 
         // Pipes
         for (let c = 0; c < gs; c++) for (let r = 0; r < gs; r++) {
@@ -219,6 +248,9 @@
             if (!cell || (c === source.col && r === source.row)) continue;
             drawPipeCell(c, r, cell.type, cell.water);
         }
+
+        // Source
+        drawSource();
 
         // Water animation on current flowing segment
         if (gamePhase === 'flow' && flowIdx < flowPath.length) {
@@ -231,13 +263,20 @@
             && gamePhase !== 'over' && gamePhase !== 'complete'
             && (hoverC !== source.col || hoverR !== source.row)) {
             const x = hoverC * cs, y = hoverR * cs;
-            ctx.fillStyle = 'rgba(0,229,160,0.06)';
-            ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+            ctx.fillStyle = 'rgba(0,229,160,0.08)';
+            if (ctx.roundRect) {
+                ctx.beginPath(); ctx.roundRect(x + 4, y + 4, cs - 8, cs - 8, 8); ctx.fill();
+            } else {
+                ctx.fillRect(x + 4, y + 4, cs - 8, cs - 8);
+            }
             if (queue.length) {
-                ctx.globalAlpha = 0.35;
+                ctx.globalAlpha = 0.5;
                 const cxh = x + cs / 2, cyh = y + cs / 2;
-                ctx.fillStyle = '#555570';
-                drawPipeRects(ctx, x, y, cs, cxh, cyh, cs * 0.16, PIPE_CONN[queue[0]]);
+                ctx.lineCap = 'butt';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#2b2f3e';
+                ctx.lineWidth = cs * 0.25;
+                drawPipePaths(ctx, cxh, cyh, cs, PIPE_CONN[queue[0]]);
                 ctx.globalAlpha = 1;
             }
         }
@@ -245,98 +284,125 @@
 
     function drawSource() {
         const x = source.col * cs, y = source.row * cs;
-        const cx = x + cs / 2, cy = y + cs / 2, hw = cs * 0.20;
+        const cx = x + cs / 2, cy = y + cs / 2, r = cs / 2;
 
-        // Glow
         ctx.save();
         ctx.shadowColor = '#e74c3c';
-        ctx.shadowBlur = 16;
+        ctx.shadowBlur = 20;
         ctx.fillStyle = 'rgba(231,76,60,0.15)';
-        ctx.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+        ctx.beginPath();
+        ctx.arc(cx, cy, cs * 0.4, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
 
-        // Pipe end
-        const conn = [0, 0, 0, 0];
-        conn[source.dir] = 1;
-        ctx.fillStyle = '#3a1a1a';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw + 3, conn);
-        ctx.fillStyle = '#c0392b';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw, conn);
-        ctx.fillStyle = '#e74c3c';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw - 2, conn);
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#3a1a1a';
+        ctx.lineWidth = cs * 0.45;
+        
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        if (source.dir === T) ctx.lineTo(cx, cy - r);
+        if (source.dir === R) ctx.lineTo(cx + r, cy);
+        if (source.dir === B) ctx.lineTo(cx, cy + r);
+        if (source.dir === L) ctx.lineTo(cx - r, cy);
+        ctx.stroke();
 
-        // Direction arrow
-        ctx.fillStyle = '#ff6b6b';
-        ctx.font = `bold ${cs * 0.3}px Outfit`;
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = cs * 0.25;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, cs * 0.25, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e1010';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, cs * 0.12, 0, Math.PI * 2);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${cs * 0.25}px Outfit`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const arrows = ['▲', '▶', '▼', '◀'];
-        const off = cs * 0.08;
+        const off = cs * 0.12;
         const ox = [0, off, 0, -off], oy = [-off, 0, off, 0];
         ctx.fillText(arrows[source.dir], cx + ox[source.dir], cy + oy[source.dir]);
     }
 
     function drawPipeCell(col, row, type, water) {
         const x = col * cs, y = row * cs;
-        const cx = x + cs / 2, cy = y + cs / 2, hw = cs * 0.23;
+        const cx = x + cs / 2, cy = y + cs / 2;
         const conn = PIPE_CONN[type];
 
-        ctx.fillStyle = '#0e0e16';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw + 4, conn);
-        ctx.fillStyle = '#555570';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw + 1, conn);
-        ctx.fillStyle = '#6a6a8a';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw - 2, conn);
-        ctx.fillStyle = '#7a7a9a';
-        drawPipeRects(ctx, x, y, cs, cx, cy, hw - 5, conn);
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'round';
+        
+        ctx.strokeStyle = '#1e212b';
+        ctx.lineWidth = cs * 0.45;
+        drawPipePaths(ctx, cx, cy, cs, conn);
+
+        ctx.strokeStyle = '#2b2f3e';
+        ctx.lineWidth = cs * 0.25;
+        drawPipePaths(ctx, cx, cy, cs, conn);
 
         if (water) {
             ctx.save();
             ctx.shadowColor = '#00e5a0';
-            ctx.shadowBlur = 14;
-            ctx.fillStyle = '#00e5a0';
-            drawPipeRects(ctx, x, y, cs, cx, cy, hw - 5, conn);
+            ctx.shadowBlur = 12;
+            ctx.strokeStyle = '#00e5a0';
+            ctx.lineWidth = cs * 0.15;
+            drawPipePaths(ctx, cx, cy, cs, conn);
             ctx.restore();
         }
     }
 
     function drawWaterPartial(col, row, entry, exit, prog) {
-        const x = col * cs, y = row * cs;
-        const cx = x + cs / 2, cy = y + cs / 2, hw = cs * 0.14;
+        const cx = col * cs + cs / 2, cy = row * cs + cs / 2, r = cs / 2;
 
         ctx.save();
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'round';
         ctx.shadowColor = '#00e5a0';
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = '#00e5a0';
+        ctx.shadowBlur = 12;
+        ctx.strokeStyle = '#00e5a0';
+        ctx.lineWidth = cs * 0.15;
 
-        if (prog <= 0.5) {
-            drawWaterArm(ctx, cx, cy, x, y, cs, hw, entry, prog * 2, true);
+        ctx.beginPath();
+        let startX = cx, startY = cy;
+        if (entry === T) startY -= r;
+        if (entry === B) startY += r;
+        if (entry === L) startX -= r;
+        if (entry === R) startX += r;
+
+        let endX = cx, endY = cy;
+        if (exit === T) endY -= r;
+        if (exit === B) endY += r;
+        if (exit === L) endX -= r;
+        if (exit === R) endX += r;
+        
+        const isStraight = (entry === T && exit === B) || (entry === B && exit === T) || (entry === L && exit === R) || (entry === R && exit === L);
+        
+        ctx.moveTo(startX, startY);
+        if (isStraight) {
+            ctx.lineTo(startX + (endX - startX) * prog, startY + (endY - startY) * prog);
         } else {
-            drawWaterArm(ctx, cx, cy, x, y, cs, hw, entry, 1, true);
-            ctx.fillRect(cx - hw, cy - hw, hw * 2, hw * 2);
-            drawWaterArm(ctx, cx, cy, x, y, cs, hw, exit, (prog - 0.5) * 2, false);
+            const steps = Math.ceil(prog * 20);
+            for (let i = 1; i <= steps; i++) {
+                const t = (i / 20);
+                if (t > prog) break;
+                ctx.lineTo(Math.pow(1-t, 2) * startX + 2*(1-t)*t * cx + Math.pow(t, 2) * endX, 
+                           Math.pow(1-t, 2) * startY + 2*(1-t)*t * cy + Math.pow(t, 2) * endY);
+            }
+            const t = prog;
+            ctx.lineTo(Math.pow(1-t, 2) * startX + 2*(1-t)*t * cx + Math.pow(t, 2) * endX, 
+                       Math.pow(1-t, 2) * startY + 2*(1-t)*t * cy + Math.pow(t, 2) * endY);
         }
-
+        
+        ctx.stroke();
         ctx.restore();
-    }
-
-    function drawWaterArm(c, cx, cy, x, y, size, hw, dir, prog, isEntry) {
-        const len = prog * size / 2;
-        if (isEntry) {
-            switch (dir) {
-                case T: c.fillRect(cx - hw, y,              hw * 2, len);    break;
-                case R: c.fillRect(x + size - len, cy - hw, len,    hw * 2); break;
-                case B: c.fillRect(cx - hw, y + size - len, hw * 2, len);    break;
-                case L: c.fillRect(x, cy - hw,              len,    hw * 2); break;
-            }
-        } else {
-            switch (dir) {
-                case T: c.fillRect(cx - hw, cy - len, hw * 2, len);    break;
-                case R: c.fillRect(cx, cy - hw,       len,    hw * 2); break;
-                case B: c.fillRect(cx - hw, cy,       hw * 2, len);    break;
-                case L: c.fillRect(cx - len, cy - hw, len,    hw * 2); break;
-            }
-        }
     }
 
     /* ── Placement ── */
@@ -366,7 +432,7 @@
         gamePhase = 'flow';
         clearInterval(prepInterval);
         cdFill.style.width = '0%';
-        setInfo('Su akıyor...', 'highlight');
+        setInfo('Water is flowing...', 'highlight');
         flowPath = [];
         flowIdx = 0;
         flowProg = 0;
@@ -447,7 +513,7 @@
             setTimeout(() => {
                 $('level-pipes').textContent = passed;
                 $('level-score-gain').textContent = score - levelScoreStart;
-                $('level-message').textContent = `${needed} boru gerekiyordu, ${passed} boru geçtin!`;
+                $('level-message').textContent = `Needed ${needed} pipes, passed through ${passed} pipes!`;
                 overlayLV.classList.remove('hidden');
             }, 300);
         } else {
@@ -459,7 +525,7 @@
                 $('final-score').textContent = score;
                 $('final-level').textContent = level;
                 $('final-pipes').textContent = passed;
-                $('final-message').textContent = `${needed} boru gerekiyordu, ${passed} boru geçebildin.`;
+                $('final-message').textContent = `Needed ${needed} pipes, only passed through ${passed} pipes.`;
                 overlayGO.classList.remove('hidden');
             }, 300);
         }
@@ -469,7 +535,7 @@
     function startPrep() {
         prepLeft = prepDuration();
         updateCountdown();
-        setInfo(`Boruları yerleştir — ${prepLeft}s`);
+        setInfo(`Place pipes — ${prepLeft}s`);
 
         prepInterval = setInterval(() => {
             prepLeft--;
@@ -477,7 +543,7 @@
                 startFlow();
             } else {
                 updateCountdown();
-                setInfo(`Boruları yerleştir — ${prepLeft}s`, prepLeft <= 5 ? 'danger' : '');
+                setInfo(`Place pipes — ${prepLeft}s`, prepLeft <= 5 ? 'danger' : '');
             }
         }, 1000);
     }
@@ -499,6 +565,7 @@
         scoreEl.textContent = score;
         levelEl.textContent = level;
         hiEl.textContent = highScore;
+        if (targetEl) targetEl.textContent = neededPipes();
         scoreEl.classList.remove('pop');
         void scoreEl.offsetWidth;
         scoreEl.classList.add('pop');
